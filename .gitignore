@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+*.env
+*.db
+*.sqlite3
+.idea/
+.vscode/
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Logs and runtime files
+*.log
+*.pid
+bot.log
+bot.pid
+bot_run.log
+bot_startup.log
