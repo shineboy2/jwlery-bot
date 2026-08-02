@@ -125,7 +125,7 @@ class CmsHandler(BaseHandler):
                 
             self.conversations.advance(chat_id, self.HANDLER_NAME, "select_category_forward", image_file_id=photo_id, caption=forward_text)
             async with self.session_factory() as session:
-                custom_cats = await cms_repo.get_all_content_categories(session)
+                custom_cats = await config_repo.get_all_content_categories(session)
             await message.reply(
                 "✅ محتوا دریافت شد.\n\nلطفاً دسته‌بندی این پست را انتخاب کنید:",
                 components=cms_create_category_keyboard(custom_cats, for_forward=True)
@@ -259,7 +259,7 @@ class CmsHandler(BaseHandler):
         if not await self.require_admin(chat_id): return
         self.conversations.start(chat_id, self.HANDLER_NAME, "select_category")
         async with ctx.session_factory() as session:
-            custom_cats = await cms_repo.get_all_content_categories(session)
+            custom_cats = await config_repo.get_all_content_categories(session)
         await callback.message.edit("✨ **ساخت مرحله به مرحله**\n\nلطفاً دسته‌بندی محتوا را انتخاب کنید:", components=cms_create_category_keyboard(custom_cats))
 
     async def select_category(self, callback: CallbackQuery, ctx, match) -> None:
@@ -374,7 +374,7 @@ class CmsHandler(BaseHandler):
 
     async def schedules(self, callback: CallbackQuery, ctx) -> None:
         async with ctx.session_factory() as session:
-            schedules = await cms_repo.get_all_publish_schedules(session)
+            schedules = await config_repo.get_all_publish_schedules(session)
         await callback.message.edit(
             "⚙️ تنظیمات زمان‌بندی (تقویم انتشار):\n\nلیست زمان‌های تنظیم شده برای انتشار خودکار:",
             components=cms_schedules_list_keyboard(schedules)
@@ -383,8 +383,8 @@ class CmsHandler(BaseHandler):
     async def schedule_del(self, callback: CallbackQuery, ctx, match) -> None:
         schedule_id = int(match.group(1))
         async with ctx.session_factory() as session:
-            await cms_repo.delete_publish_schedule(session, schedule_id)
-            schedules = await cms_repo.get_all_publish_schedules(session)
+            await config_repo.delete_publish_schedule(session, schedule_id)
+            schedules = await config_repo.get_all_publish_schedules(session)
         await callback.message.edit(
             "✅ زمان‌بندی با موفقیت حذف شد.\n\nلیست زمان‌های تنظیم شده:",
             components=cms_schedules_list_keyboard(schedules)
@@ -409,7 +409,7 @@ class CmsHandler(BaseHandler):
             await callback.message.edit("🗂 لطفاً دسته‌بندی محصولات را برای این زمان‌بندی انتخاب کنید:", components=category_select_for_schedule_keyboard(categories, slot_type))
         else:
             async with ctx.session_factory() as session:
-                post_queues = await cms_repo.get_all_content_categories(session)
+                post_queues = await config_repo.get_all_content_categories(session)
             await callback.message.edit("🗂 لطفاً دسته‌بندی محتوا را انتخاب کنید:", components=category_select_for_schedule_keyboard(post_queues, slot_type))
 
     async def schedule_cat(self, callback: CallbackQuery, ctx, match) -> None:
@@ -420,10 +420,10 @@ class CmsHandler(BaseHandler):
         if not state or state.step != "sch_awaiting_cat": return
         time_str = state.data["time"]
         async with ctx.session_factory() as session:
-            await cms_repo.create_publish_schedule(session, slot_type=slot_type, time=time_str, count=1, post_category=category_name)
+            await config_repo.create_publish_schedule(session, slot_type=slot_type, time=time_str, count=1, post_category=category_name)
         self.conversations.end(chat_id, self.HANDLER_NAME)
         async with ctx.session_factory() as session:
-            schedules = await cms_repo.get_all_publish_schedules(session)
+            schedules = await config_repo.get_all_publish_schedules(session)
         await callback.message.edit(
             f"✅ زمان‌بندی جدید ({time_str} برای {category_name}) با موفقیت ایجاد شد.\n\nلیست:",
             components=cms_schedules_list_keyboard(schedules)

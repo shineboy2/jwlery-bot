@@ -3,7 +3,7 @@ from sqlalchemy import select, func
 from bale import Message, CallbackQuery, InlineKeyboardButton
 from app.bot.handlers.base import BaseHandler
 from app.bot.router import CallbackRouter, MessageRouter
-from app.database.repositories import cms_repo
+from app.database.repositories import config_repo, cms_repo
 from app.database.repositories.cms_repo import (
     count_published_by_category, get_published_by_category
 )
@@ -46,11 +46,11 @@ class CmsCategoryHandler(BaseHandler):
             code = text.upper().strip()
             try:
                 async with self.session_factory() as session:
-                    await cms_repo.create_content_category(session, name, code)
+                    await config_repo.create_content_category(session, name, code)
                 self.conversations.end(chat_id, self.HANDLER_NAME)
                 
                 async with self.session_factory() as session:
-                    categories = await cms_repo.get_all_content_categories(session)
+                    categories = await config_repo.get_all_content_categories(session)
                 await message.reply(
                     f"✅ دسته‌بندی '{name}' با کد '{code}' ایجاد شد.\nحالا می‌توانید پرامپت آن را تنظیم کنید.", 
                     components=cms_categories_list_keyboard(categories)
@@ -93,7 +93,7 @@ class CmsCategoryHandler(BaseHandler):
         if not await self.require_admin(chat_id): return
 
         async with ctx.session_factory() as session:
-            categories = await cms_repo.get_all_content_categories(session)
+            categories = await config_repo.get_all_content_categories(session)
         await callback.message.edit(
             "🏷 **مدیریت دسته‌بندی‌های محتوا**\n\nشما می‌توانید دسته‌بندی‌های مختلف (مانند آموزشی، صبح بخیر، و...) بسازید و برای هرکدام یک دستورالعمل (پرامپت) مجزا تنظیم کنید تا هوش مصنوعی بر اساس آن محتوا تولید کند.",
             components=cms_categories_list_keyboard(categories)
@@ -157,8 +157,8 @@ class CmsCategoryHandler(BaseHandler):
         cat_id = int(match.group(1))
             
         async with ctx.session_factory() as session:
-            await cms_repo.delete_content_category(session, cat_id)
-            categories = await cms_repo.get_all_content_categories(session)
+            await config_repo.delete_content_category(session, cat_id)
+            categories = await config_repo.get_all_content_categories(session)
         await callback.message.edit("✅ دسته‌بندی با موفقیت حذف شد.", components=cms_categories_list_keyboard(categories))
 
     async def history(self, callback: CallbackQuery, ctx, match) -> None:

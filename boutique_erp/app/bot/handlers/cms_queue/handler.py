@@ -2,7 +2,7 @@ import logging
 from bale import Message, CallbackQuery, InlineKeyboardButton
 from app.bot.handlers.base import BaseHandler
 from app.bot.router import CallbackRouter, MessageRouter
-from app.database.repositories import cms_repo
+from app.database.repositories import product_repo, cms_repo, config_repo
 from app.database.repositories.cms_repo import SYSTEM_CATEGORIES
 from app.bot.handlers.cms.keyboards import (
     cms_queue_menu_keyboard, cms_queue_list_keyboard, cms_queue_post_keyboard,
@@ -89,7 +89,7 @@ class CmsQueueHandler(BaseHandler):
         if not await self.require_admin(chat_id): return
 
         async with ctx.session_factory() as session:
-            custom_cats = await cms_repo.get_all_content_categories(session)
+            custom_cats = await config_repo.get_all_content_categories(session)
             counts = {}
             for code in SYSTEM_CATEGORIES:
                 counts[code] = await cms_repo.count_queued_by_category(session, code)
@@ -236,7 +236,7 @@ class CmsQueueHandler(BaseHandler):
         if not await self.require_admin(chat_id): return
 
         async with ctx.session_factory() as session:
-            custom_cats = await cms_repo.get_all_content_categories(session)
+            custom_cats = await config_repo.get_all_content_categories(session)
             counts = {}
             for code in SYSTEM_CATEGORIES:
                 counts[code] = await cms_repo.count_buffered_by_category(session, code)
