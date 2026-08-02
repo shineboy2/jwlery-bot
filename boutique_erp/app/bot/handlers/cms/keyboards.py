@@ -19,11 +19,10 @@ def cms_menu_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("📜 تاریخچه انتشار", callback_data="cms:history"),
-            InlineKeyboardButton("🏷 دسته‌بندی‌ها", callback_data="cms:cat:manage"),
+            InlineKeyboardButton("🏷 دسته‌بندی‌های محتوا", callback_data="cms:cat:manage"),
         ],
         [
             InlineKeyboardButton("⚙️ تنظیمات زمان‌بندی", callback_data="cms:schedules"),
-            InlineKeyboardButton("🤖 پرامپت‌ها", callback_data="cms:prompts"),
         ],
         [InlineKeyboardButton("🏠 بازگشت به منوی اصلی", callback_data="menu:main")],
     ])

@@ -25,9 +25,7 @@ def cms_category_detail_keyboard(cat_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("✏️ ویرایش نام", callback_data=f"cms:cat:edit_name:{cat_id}"),
             InlineKeyboardButton("✏️ ویرایش کد", callback_data=f"cms:cat:edit_code:{cat_id}")
         ],
-        [
-            InlineKeyboardButton("🤖 تنظیم پرامپت هوش مصنوعی", callback_data=f"cms:cat:edit_prompt:{cat_id}")
-        ],
+
         [
             InlineKeyboardButton("📜 تاریخچه پست‌های این دسته", callback_data=f"cms:cat:hist:{cat_id}:1")
         ],

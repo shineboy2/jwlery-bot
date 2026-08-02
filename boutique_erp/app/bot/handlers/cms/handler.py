@@ -51,10 +51,7 @@ class CmsHandler(BaseHandler):
         router.register_pattern(r"^cms:sch:type:(PRODUCT|POST)$", self.schedule_type)
         router.register_pattern(r"^cms:sch:cat:(PRODUCT|POST):(.+)$", self.schedule_cat)
         
-        # Prompts
-        router.register_exact("cms:prompts", self.prompts)
-        router.register_pattern(r"^cms:prompt:edit:(.+)$", self.prompt_edit)
-        
+
         # Config
         router.register_exact("cms:config", self.config_menu)
         
@@ -72,19 +69,6 @@ class CmsHandler(BaseHandler):
 
         step = state.step
         text = message.content.strip() if message.content else ""
-
-        # --- Old CMS Prompts/Config FSM ---
-        if step == "awaiting_prompt_text":
-            prompt_name = state.data["prompt_name"]
-            try:
-                async with self.session_factory() as session:
-                    await config_repo.set_ai_prompt(session, prompt_name, text)
-                await message.reply(f"✅ پرامپت '{prompt_name}' با موفقیت بروزرسانی شد.", components=cms_menu_keyboard())
-            except Exception as e:
-                logger.error(f"Error saving prompt: {e}")
-                await message.reply("❌ خطا در ذخیره پرامپت.", components=cms_menu_keyboard())
-            self.conversations.end(chat_id, self.HANDLER_NAME)
-            return True
 
         if step == "sch_awaiting_time":
             time_str = text
@@ -427,26 +411,6 @@ class CmsHandler(BaseHandler):
         await callback.message.edit(
             f"✅ زمان‌بندی جدید ({time_str} برای {category_name}) با موفقیت ایجاد شد.\n\nلیست:",
             components=cms_schedules_list_keyboard(schedules)
-        )
-
-    async def prompts(self, callback: CallbackQuery, ctx) -> None:
-        prompts_kb = build_kb([
-            [InlineKeyboardButton("پرامپت توضیحات محصول", callback_data="cms:prompt:edit:product_description")],
-            [InlineKeyboardButton("بازگشت", callback_data="menu:cms")]
-        ])
-        await callback.message.edit("🤖 مدیریت پرامپت‌های هوش مصنوعی\n\nبرای ویرایش دستورالعمل هوش مصنوعی، یکی از گزینه‌ها را انتخاب کنید:", components=prompts_kb)
-
-    async def prompt_edit(self, callback: CallbackQuery, ctx, match) -> None:
-        chat_id = callback.message.chat.id
-        prompt_name = match.group(1)
-        self.conversations.start(chat_id, self.HANDLER_NAME, "awaiting_prompt_text", {"prompt_name": prompt_name})
-        async with ctx.session_factory() as session:
-            current_prompt = await config_repo.get_ai_prompt_by_name(session, prompt_name)
-        current_text = current_prompt or "تنظیم نشده (از پیش‌فرض استفاده می‌شود)"
-        cancel_kb = build_kb([[InlineKeyboardButton("❌ لغو", callback_data="cms:prompts")]])
-        await callback.message.edit(
-            f"مقدار فعلی:\n{current_text}\n\nلطفاً متن جدید را برای پرامپت '{prompt_name}' وارد کنید:\n(متن شما جایگزین متن پیش‌فرض هوش مصنوعی می‌شود)",
-            components=cancel_kb
         )
 
     async def history_first_page(self, callback: CallbackQuery, ctx) -> None:
