@@ -2,24 +2,20 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Dict, Any
 
-from app.database.crud import (
-    get_paid_orders_between,
-    get_expenses_between,
-    get_partner_transactions_between,
-    get_all_partners
-)
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.repositories import order_repo, finance_repo
 from app.utils.formatters import format_price, to_persian_digits
 
 logger = logging.getLogger(__name__)
 
-async def calculate_pl_report(start_date: datetime = None, end_date: datetime = None) -> Dict[str, Any]:
+async def calculate_pl_report(session: AsyncSession, start_date: datetime = None, end_date: datetime = None) -> Dict[str, Any]:
     """
     Calculate Profit & Loss (P&L) and partner equity.
     """
-    orders = await get_paid_orders_between(start_date, end_date)
-    expenses = await get_expenses_between(start_date, end_date)
-    partner_txs = await get_partner_transactions_between(start_date, end_date)
-    partners = await get_all_partners()
+    orders = await order_repo.get_paid_orders_between(session, start_date, end_date)
+    expenses = await finance_repo.get_expenses_between(session, start_date, end_date)
+    partner_txs = await finance_repo.get_partner_transactions_between(session, start_date, end_date)
+    partners = await finance_repo.get_all_partners(session)
 
     # 1. Revenue & COGS
     total_revenue = 0

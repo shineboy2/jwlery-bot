@@ -4,21 +4,20 @@ Logistics Service: Export orders, process bulk tracking codes.
 import logging
 import csv
 import io
-from app.database.crud import get_orders_by_status, update_order_status
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.repositories import order_repo
 
 logger = logging.getLogger(__name__)
 
-async def export_paid_orders_csv() -> bytes:
+async def export_paid_orders_csv(session: AsyncSession) -> bytes:
     """Generate CSV file for PAID and PAID_HELD orders."""
     from app.database.models import Order
-    from app.database.base import async_session
     from sqlalchemy import select
 
-    async with async_session() as session:
-        result = await session.execute(
-            select(Order).where(Order.status.in_(["PAID", "PAID_HELD"]))
-        )
-        orders = result.scalars().all()
+    result = await session.execute(
+        select(Order).where(Order.status.in_(["PAID", "PAID_HELD"]))
+    )
+    orders = result.scalars().all()
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -42,7 +41,7 @@ async def export_paid_orders_csv() -> bytes:
     return output.getvalue().encode('utf-8-sig')
 
 
-async def process_bulk_tracking_codes(text: str) -> dict:
+async def process_bulk_tracking_codes(session: AsyncSession, text: str) -> dict:
     """
     Process multi-line text:
     Format:
@@ -71,7 +70,7 @@ async def process_bulk_tracking_codes(text: str) -> dict:
             order_id = int(parts[0].strip())
             tracking_code = parts[1].strip()
             
-            order = await update_order_status(order_id, "SHIPPED", tracking_code=tracking_code)
+            order = await order_repo.update_order_status(session, order_id, "SHIPPED", tracking_code=tracking_code)
             if order:
                 success_count += 1
             else:

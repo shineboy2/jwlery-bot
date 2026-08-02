@@ -8,8 +8,8 @@ import os
 # Add the project root to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.bot.loader import bot, register_handlers
-from app.core.scheduler import start_scheduler
+from app.core.config import Settings
+from app.bot.application import BotApplication
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,21 +21,15 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
 def main():
-    """Start the bot."""
+    """Start the bot using BotApplication."""
     logger.info("Starting Smart Boutique ERP Bot...")
     
-    @bot.event
-    async def on_ready():
-        logger.info(f"Bot connected as {bot.user.username}")
-        start_scheduler()
-        logger.info("Scheduler started.")
-
-    register_handlers()
-    logger.info("Handlers registered. Bot is now running.")
-    bot.run()
-
+    config = Settings()
+    
+    app = BotApplication(config)
+    app.initialize()
+    app.run()
 
 if __name__ == "__main__":
     main()

@@ -4,14 +4,15 @@ Channel publishing service for sending/updating/removing product posts.
 import logging
 from typing import Optional
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
-from app.database.crud import get_product_by_id, update_product, get_product_images
-from app.utils.formatters import format_channel_post
+from app.database.repositories import product_repo
+from app.bot.handlers.product.renderers import format_channel_post
 
 logger = logging.getLogger(__name__)
 
 
-async def publish_to_channel(bot, product_id: int) -> Optional[int]:
+async def publish_to_channel(session: AsyncSession, bot, product_id: int) -> Optional[int]:
     """
     Publish product to channel.
 
@@ -24,13 +25,13 @@ async def publish_to_channel(bot, product_id: int) -> Optional[int]:
 
     Returns: message_id if successful, None otherwise.
     """
-    product = await get_product_by_id(product_id)
+    product = await product_repo.get_product_by_id(session, product_id)
     if not product:
         logger.error(f"Product {product_id} not found for channel publish")
         return None
 
     category = product.category
-    images = await get_product_images(product_id)
+    images = await product_repo.get_product_images(session, product_id)
     caption = format_channel_post(product, category, images)
     # Use channel_username as it's more reliable for public channels in Bale
     channel_id = settings.channel_username or str(settings.channel_id)
@@ -73,7 +74,7 @@ async def publish_to_channel(bot, product_id: int) -> Optional[int]:
 
         if message_id:
             # Save channel_message_id to product
-            await update_product(product_id, channel_message_id=message_id)
+            await product_repo.update_product(session, product_id, channel_message_id=message_id)
             logger.info(f"Product {product_id} published to channel, message_id={message_id}")
 
         return message_id
@@ -83,17 +84,17 @@ async def publish_to_channel(bot, product_id: int) -> Optional[int]:
         return None
 
 
-async def update_channel_post(bot, product_id: int) -> bool:
+async def update_channel_post(session: AsyncSession, bot, product_id: int) -> bool:
     """
     Update existing channel post when product is edited (price/stock change).
     Uses bot.edit_message_caption if message_id exists.
     """
-    product = await get_product_by_id(product_id)
+    product = await product_repo.get_product_by_id(session, product_id)
     if not product or not product.channel_message_id:
         return False
 
     category = product.category
-    images = await get_product_images(product_id)
+    images = await product_repo.get_product_images(session, product_id)
     caption = format_channel_post(product, category, images)
 
     try:
@@ -109,11 +110,11 @@ async def update_channel_post(bot, product_id: int) -> bool:
         return False
 
 
-async def remove_channel_post(bot, product_id: int) -> bool:
+async def remove_channel_post(session: AsyncSession, bot, product_id: int) -> bool:
     """
     Delete channel post when product is deactivated.
     """
-    product = await get_product_by_id(product_id)
+    product = await product_repo.get_product_by_id(session, product_id)
     if not product or not product.channel_message_id:
         return False
 
@@ -122,8 +123,7 @@ async def remove_channel_post(bot, product_id: int) -> bool:
             chat_id=settings.channel_id,
             message_id=product.channel_message_id,
         )
-        # Clear channel_message_id in DB
-        await update_product(product_id, channel_message_id=None)
+        await product_repo.update_product(session, product_id, channel_message_id=None)
         logger.info(f"Channel post for product {product_id} removed")
         return True
     except Exception as e:

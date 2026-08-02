@@ -2,7 +2,8 @@
 Authentication decorators for admin-only handlers.
 """
 from functools import wraps
-from app.database.crud import get_admin_by_chat_id
+from app.database.session import async_session
+from app.database.repositories import user_repo
 from app.core.constants import AdminRole
 
 
@@ -18,7 +19,8 @@ def admin_required(func):
         else:
             return
 
-        admin = await get_admin_by_chat_id(chat_id)
+        async with async_session() as session:
+            admin = await user_repo.get_admin_by_chat_id(session, chat_id)
         if not admin or not admin.is_active:
             return  # Silently ignore non-admins
 
@@ -37,7 +39,8 @@ def super_admin_required(func):
         else:
             return
 
-        admin = await get_admin_by_chat_id(chat_id)
+        async with async_session() as session:
+            admin = await user_repo.get_admin_by_chat_id(session, chat_id)
         if not admin or admin.role != AdminRole.SUPER_ADMIN:
             return
 

@@ -3,15 +3,12 @@ Product business logic service layer.
 """
 from typing import Optional
 
-from app.database.crud import (
-    create_product, add_product_image, get_product_by_id,
-    get_product_images, search_products as db_search_products
-)
-from app.database.models import Product
-from app.utils.sku_generator import generate_sku
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.repositories import product_repo
 
 
 async def register_product(
+    session: AsyncSession,
     sku: str,
     category_id: int,
     description: str,
@@ -31,7 +28,8 @@ async def register_product(
     Prices are expected in RIALS.
     """
     # Step 1: Create product
-    product = await create_product(
+    product = await product_repo.create_product(
+        session=session,
         sku=sku,
         category_id=category_id,
         description=description,
@@ -46,7 +44,8 @@ async def register_product(
     # Step 3: Save images
     for i, file_id in enumerate(image_file_ids):
         is_primary = (i == 0)  # First image is primary
-        await add_product_image(
+        await product_repo.add_product_image(
+            session=session,
             product_id=product.id,
             file_id=file_id,
             is_primary=is_primary,
@@ -54,18 +53,18 @@ async def register_product(
         )
 
     # Step 4: Return complete product
-    return await get_product_by_id(product.id)
+    return await product_repo.get_product_by_id(session, product.id)
 
 
-async def get_product_card(product_id: int) -> Optional[dict]:
+async def get_product_card(session: AsyncSession, product_id: int) -> Optional[dict]:
     """
     Return product with images + category info for display.
     """
-    product = await get_product_by_id(product_id)
+    product = await product_repo.get_product_by_id(session, product_id)
     if not product:
         return None
 
-    images = await get_product_images(product_id)
+    images = await product_repo.get_product_images(session, product_id)
     primary_image = next((img for img in images if img.is_primary), images[0] if images else None)
 
     return {
@@ -76,6 +75,6 @@ async def get_product_card(product_id: int) -> Optional[dict]:
     }
 
 
-async def search_products(query: str) -> list[Product]:
+async def search_products(session: AsyncSession, query: str) -> list[Product]:
     """Search products by SKU or description."""
-    return await db_search_products(query)
+    return await product_repo.search_products(session, query)

@@ -4,19 +4,18 @@ Order business logic service: create, confirm payment, ship, cancel.
 import logging
 from typing import Optional
 
-from app.database.crud import (
-    create_order, get_order_by_id, update_order_status,
-    reserve_stock, release_stock, update_stock, get_product_by_id
-)
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.repositories import order_repo, product_repo
 from app.database.models import Order
 from app.core.constants import OrderStatus
 from app.core.config import settings
-from app.utils.formatters import format_payment_message
+from app.bot.handlers.order.renderers import format_payment_message
 
 logger = logging.getLogger(__name__)
 
 
 async def create_new_order(
+    session: AsyncSession,
     user_id: int,
     items: list[dict],
     shipping_cost: int = 0,
@@ -36,7 +35,7 @@ async def create_new_order(
     """
     # Step 1: Validate stock
     for item in items:
-        product = await get_product_by_id(item["product_id"])
+        product = await product_repo.get_product_by_id(session, item["product_id"])
         if not product:
             logger.error(f"Product {item['product_id']} not found")
             return None
@@ -50,14 +49,15 @@ async def create_new_order(
 
     # Step 2: Reserve stock
     for item in items:
-        success = await reserve_stock(item["product_id"], item["quantity"])
+        success = await product_repo.reserve_stock(session, item["product_id"], item["quantity"])
         if not success:
             # Rollback already reserved items
             logger.error(f"Failed to reserve stock for product {item['product_id']}")
             return None
 
     # Step 3 & 4: Create order and order_items
-    order = await create_order(
+    order = await order_repo.create_order(
+        session=session,
         user_id=user_id,
         items=items,
         shipping_cost=shipping_cost,
@@ -69,6 +69,7 @@ async def create_new_order(
 
 
 async def confirm_payment(
+    session: AsyncSession,
     order_id: int,
     receipt_file_id: Optional[str] = None,
     card_last4: Optional[str] = None,
@@ -82,7 +83,7 @@ async def confirm_payment(
     3. Release reserved_quantity
     4. Save receipt info
     """
-    order = await get_order_by_id(order_id)
+    order = await order_repo.get_order_by_id(session, order_id)
     if not order:
         return None
 
@@ -94,21 +95,22 @@ async def confirm_payment(
         kwargs["payment_card_last4"] = card_last4
 
     was_pending = order.status == OrderStatus.PENDING_PAYMENT.value
-    order = await update_order_status(order_id, OrderStatus.PAID.value, **kwargs)
+    order = await order_repo.update_order_status(session, order_id, OrderStatus.PAID.value, **kwargs)
 
     # Update actual stock for each item only if it was pending
     if was_pending:
         for item in order.items:
-            await update_stock(item.product_id, -item.quantity)  # Decrease stock
-            await release_stock(item.product_id, item.quantity)   # Release reservation
+            await product_repo.update_stock(session, item.product_id, -item.quantity)  # Decrease stock
+            await product_repo.release_stock(session, item.product_id, item.quantity)   # Release reservation
 
     logger.info(f"Order {order_id} payment confirmed")
     return order
 
 
-async def ship_order(order_id: int, tracking_code: str) -> Optional[Order]:
+async def ship_order(session: AsyncSession, order_id: int, tracking_code: str) -> Optional[Order]:
     """Set order status to SHIPPED and save tracking code."""
-    order = await update_order_status(
+    order = await order_repo.update_order_status(
+        session,
         order_id,
         OrderStatus.SHIPPED.value,
         tracking_code=tracking_code
@@ -118,7 +120,7 @@ async def ship_order(order_id: int, tracking_code: str) -> Optional[Order]:
     return order
 
 
-async def cancel_order(order_id: int) -> Optional[Order]:
+async def cancel_order(session: AsyncSession, order_id: int) -> Optional[Order]:
     """
     Cancel an order and release reserved stock.
 
@@ -126,16 +128,16 @@ async def cancel_order(order_id: int) -> Optional[Order]:
     1. Set status = CANCELLED
     2. Release reserved stock back
     """
-    order = await get_order_by_id(order_id)
+    order = await order_repo.get_order_by_id(session, order_id)
     if not order:
         return None
 
     # Only release stock if order was pending (not yet paid/shipped)
     if order.status == OrderStatus.PENDING_PAYMENT.value:
         for item in order.items:
-            await release_stock(item.product_id, item.quantity)
+            await product_repo.release_stock(session, item.product_id, item.quantity)
 
-    order = await update_order_status(order_id, OrderStatus.CANCELLED.value)
+    order = await order_repo.update_order_status(session, order_id, OrderStatus.CANCELLED.value)
     logger.info(f"Order {order_id} cancelled")
     return order
 

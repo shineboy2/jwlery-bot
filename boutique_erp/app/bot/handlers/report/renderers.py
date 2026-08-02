@@ -1,31 +1,4 @@
-"""
-Persian text formatting utilities for channel posts and reports.
-"""
-from app.core.config import settings
-
-
-def to_persian_digits(text: str) -> str:
-    """Convert English digits to Persian digits."""
-    persian_digits = "۰۱۲۳۴۵۶۷۸۹"
-    return "".join(persian_digits[int(c)] if c.isdigit() else c for c in str(text))
-
-
-def format_price(amount_rials: int) -> str:
-    """
-    Convert rials to formatted Persian toman string.
-    Example: 10000000 → '۱,۰۰۰,۰۰۰ تومان'
-    """
-    tomans = amount_rials // 10
-    formatted = f"{tomans:,}"
-    return to_persian_digits(formatted) + " تومان"
-
-
-def format_number(number: int) -> str:
-    """Format number with Persian digits and comma separators."""
-    return to_persian_digits(f"{number:,}")
-
-
-
+from app.utils.formatters import format_price, to_persian_digits, format_number
 
 def format_profit_report(data: dict, period: str = "کل") -> str:
     """Format profit report for display."""
@@ -41,7 +14,6 @@ def format_profit_report(data: dict, period: str = "کل") -> str:
         "\n"
         f"📦 تعداد سفارشات: {format_number(data['order_count'])}"
     )
-
 
 def format_inventory_report(data: dict) -> str:
     """Format inventory report for display."""

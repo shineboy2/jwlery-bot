@@ -1,23 +1,19 @@
 import logging
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, timedelta, timezone
-
-from app.database.base import async_session
-from app.services.order_service import cancel_order
+from datetime import datetime, timedelta
 from sqlalchemy import select, or_
+
+from app.core.context import ApplicationContext
 from app.database.models import ScheduledPost, Order, PublishSchedule, Product, SystemConfig
-from app.bot.loader import bot
+from app.services.order_service import cancel_order
 from app.services.cms_service import publish_scheduled_post
 from app.services.channel_service import publish_to_channel
 
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler()
-
-async def cancel_expired_orders():
+async def cancel_expired_orders(ctx: ApplicationContext):
     """Cancel PENDING_PAYMENT orders older than 2 hours."""
     try:
-        async with async_session() as session:
+        async with ctx.session_factory() as session:
             expire_threshold = datetime.now() - timedelta(hours=2)
             result = await session.execute(
                 select(Order)
@@ -31,10 +27,10 @@ async def cancel_expired_orders():
     except Exception as e:
         logger.error(f"Error in cancel_expired_orders job: {e}")
 
-async def publish_pending_posts():
+async def publish_pending_posts(ctx: ApplicationContext):
     """Publish ScheduledPosts that have a specific publish_time that is due."""
     try:
-        async with async_session() as session:
+        async with ctx.session_factory() as session:
             now = datetime.now()
             result = await session.execute(
                 select(ScheduledPost)
@@ -44,7 +40,7 @@ async def publish_pending_posts():
             )
             posts = result.scalars().all()
             for post in posts:
-                success = await publish_scheduled_post(bot, post)
+                success = await publish_scheduled_post(ctx.bot, post)
                 if success:
                     post.status = "PUBLISHED"
                     logger.info(f"Auto-published scheduled post {post.id}")
@@ -55,13 +51,12 @@ async def publish_pending_posts():
     except Exception as e:
         logger.error(f"Error in publish_pending_posts job: {e}")
 
-async def publish_dynamic_slots():
+async def publish_dynamic_slots(ctx: ApplicationContext):
     """Check PublishSchedule and publish products or queued category posts."""
     try:
-        async with async_session() as session:
+        async with ctx.session_factory() as session:
             current_time = datetime.now().strftime("%H:%M")
             
-            # Find matching active schedules
             schedules_result = await session.execute(
                 select(PublishSchedule)
                 .where(PublishSchedule.is_active == True)
@@ -72,7 +67,6 @@ async def publish_dynamic_slots():
             if not schedules:
                 return
                 
-            # Get cooldown config
             config_result = await session.execute(select(SystemConfig).where(SystemConfig.key == "product_cooldown_days"))
             config = config_result.scalar_one_or_none()
             cooldown_days = int(config.value) if config else 4
@@ -80,7 +74,6 @@ async def publish_dynamic_slots():
             
             for schedule in schedules:
                 if schedule.slot_type == "PRODUCT":
-                    # Publish products
                     query = (
                         select(Product)
                         .where(Product.status == "ACTIVE")
@@ -102,14 +95,13 @@ async def publish_dynamic_slots():
                     )
                     products = products_result.scalars().all()
                     for p in products:
-                        msg_id = await publish_to_channel(bot, p.id)
+                        msg_id = await publish_to_channel(ctx.bot, p.id)
                         if msg_id:
                             p.last_published_at = datetime.now().date()
                             await session.commit()
                             logger.info(f"Auto-published product {p.id} via dynamic schedule.")
                             
                 elif schedule.slot_type == "POST" and schedule.post_category:
-                    # Publish from queue
                     posts_result = await session.execute(
                         select(ScheduledPost)
                         .where(ScheduledPost.status == "QUEUED")
@@ -120,7 +112,7 @@ async def publish_dynamic_slots():
                     )
                     posts = posts_result.scalars().all()
                     for post in posts:
-                        success = await publish_scheduled_post(bot, post)
+                        success = await publish_scheduled_post(ctx.bot, post)
                         if success:
                             post.status = "PUBLISHED"
                             logger.info(f"Auto-published queued post {post.id} (Category: {schedule.post_category})")
@@ -132,10 +124,11 @@ async def publish_dynamic_slots():
     except Exception as e:
         logger.error(f"Error in publish_dynamic_slots job: {e}")
 
-def start_scheduler():
+def register_jobs(ctx: ApplicationContext):
+    """Register all scheduled jobs using the ApplicationContext."""
+    scheduler = ctx.scheduler
     if not scheduler.running:
-        scheduler.add_job(cancel_expired_orders, 'interval', minutes=30)
-        scheduler.add_job(publish_pending_posts, 'interval', minutes=1)
-        scheduler.add_job(publish_dynamic_slots, 'interval', minutes=1)
-        scheduler.start()
-        logger.info("Scheduler started.")
+        scheduler.add_job(cancel_expired_orders, 'interval', minutes=30, args=[ctx])
+        scheduler.add_job(publish_pending_posts, 'interval', minutes=1, args=[ctx])
+        scheduler.add_job(publish_dynamic_slots, 'interval', minutes=1, args=[ctx])
+        logger.info("Scheduler jobs registered.")

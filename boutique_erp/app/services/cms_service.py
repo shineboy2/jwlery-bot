@@ -11,7 +11,9 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-async def publish_post_to_channel(bot, post) -> bool:
+from sqlalchemy.ext.asyncio import AsyncSession
+
+async def publish_post_to_channel(session: AsyncSession, bot, post) -> bool:
     """
     Publish a ScheduledPost to the channel.
     - Uses image_file_id (single image) if available
@@ -35,14 +37,12 @@ async def publish_post_to_channel(bot, post) -> bool:
             )
 
         # Mark as published
-        from app.database.base import async_session
         from app.database.models import ScheduledPost
-        async with async_session() as session:
-            db_post = await session.get(ScheduledPost, post.id)
-            if db_post:
-                db_post.status = "published"
-                db_post.published_at = datetime.now()
-                await session.commit()
+        db_post = await session.get(ScheduledPost, post.id)
+        if db_post:
+            db_post.status = "published"
+            db_post.published_at = datetime.now()
+            await session.commit()
 
         logger.info(f"Published ScheduledPost {post.id} (category={post.category}) to channel")
         return True
@@ -52,6 +52,6 @@ async def publish_post_to_channel(bot, post) -> bool:
         return False
 
 
-async def publish_scheduled_post(bot, post) -> bool:
+async def publish_scheduled_post(session: AsyncSession, bot, post) -> bool:
     """Legacy alias — kept for backward compatibility with old CMS code."""
-    return await publish_post_to_channel(bot, post)
+    return await publish_post_to_channel(session, bot, post)
