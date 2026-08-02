@@ -42,13 +42,13 @@ class BotApplication:
         from app.bot.handlers.report.handler import ReportHandler
         from app.bot.handlers.cms.handler import CmsHandler
         from app.bot.handlers.cms_queue.handler import CmsQueueHandler
-        from app.bot.handlers.cms_category.handler import CMSCategoryHandler
+        from app.bot.handlers.cms_category.handler import CmsCategoryHandler
         from app.bot.handlers.finance.handler import FinanceHandler
 
         handler_classes = [
             AdminHandler, CategoryHandler, ProductHandler, ProductChannelHandler, OrderHandler,
             CustomerHandler, ReportHandler, CmsHandler, CmsQueueHandler,
-            CMSCategoryHandler, FinanceHandler
+            CmsCategoryHandler, FinanceHandler
         ]
 
         for cls in handler_classes:

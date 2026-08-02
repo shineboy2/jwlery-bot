@@ -1,5 +1,5 @@
 import logging
-from bale import CallbackQuery, InlineKeyboardButton
+from bale import CallbackQuery, InlineKeyboardButton, Message
 from app.bot.handlers.base import BaseHandler
 from app.bot.router import CallbackRouter, MessageRouter
 from app.database.repositories import product_repo
@@ -19,6 +19,10 @@ class ProductChannelHandler(BaseHandler):
         router.register_pattern(r"^ch:pub_type:(\d+):([A-Z_]+)$", self.channel_publish_type)
         router.register_pattern(r"^ch:update:(\d+)$", self.channel_update)
         router.register_pattern(r"^ch:remove:(\d+)$", self.channel_remove)
+
+    async def handle_message(self, message: Message) -> bool:
+        # ProductChannelHandler doesn't handle direct messages
+        return False
 
     async def channel_publish(self, callback: CallbackQuery, ctx, match) -> None:
         chat_id = callback.message.chat.id

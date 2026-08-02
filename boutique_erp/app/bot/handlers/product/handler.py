@@ -54,12 +54,7 @@ class ProductHandler(BaseHandler):
         router.register_pattern(r"^prod:edit:(\d+)$", self.edit_menu)
         router.register_pattern(r"^prod:edit:([a-z_]+):(\d+)$", self.edit_field)
         
-        # Channel Routes
-        router.register_pattern(r"^ch:publish:(\d+)$", self.channel_publish)
-        router.register_pattern(r"^ch:pub_direct:(\d+)$", self.channel_publish_direct)
-        router.register_pattern(r"^ch:pub_type:(\d+):([a-zA-Z_]+)$", self.channel_publish_type)
-        router.register_pattern(r"^ch:update:(\d+)$", self.channel_update)
-        router.register_pattern(r"^ch:remove:(\d+)$", self.channel_remove)
+
 
     async def handle_message(self, message: Message) -> bool:
         chat_id = message.chat.id

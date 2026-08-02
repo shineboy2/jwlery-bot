@@ -5,6 +5,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.repositories import product_repo
+from app.database.models import Product
 
 
 async def register_product(
