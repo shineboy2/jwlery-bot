@@ -1,5 +1,5 @@
 import logging
-from bale import Message, CallbackQuery, InlineKeyboardButton
+from bale import Message, CallbackQuery, InlineKeyboardButton, InputFile
 from app.bot.handlers.base import BaseHandler
 from app.bot.router import CallbackRouter, MessageRouter
 from app.database.repositories import product_repo, cms_repo, config_repo
@@ -11,6 +11,19 @@ from app.bot.handlers.cms.keyboards import (
 from app.services.cms_service import publish_post_to_channel
 
 logger = logging.getLogger(__name__)
+
+def extract_post_title(caption: str) -> str:
+    if not caption:
+        return "بدون کپشن"
+    lines = caption.strip().split('\n')
+    for line in lines:
+        if '#' in line and 'کد' in line:
+            return line.strip()
+    for line in lines:
+        if line.strip():
+            return line.strip()[:35] + "..." if len(line.strip()) > 35 else line.strip()
+    return "بدون کپشن"
+
 
 class CmsQueueHandler(BaseHandler):
     HANDLER_NAME = "cms_queue"
@@ -122,9 +135,9 @@ class CmsQueueHandler(BaseHandler):
         text = f"📋 **صف «{cat_label}»** — {len(posts)} پست\n\n"
         for i, p in enumerate(posts, start=1):
             icon = "🖼" if p.image_file_id else "📝"
-            sku_part = " | SKU" if p.product_id else ""
-            preview = p.content_text[:35].replace("\n", " ")
-            text += f"{i}. {icon}{sku_part} {preview}...\n"
+            sku_part = " [محصول]" if p.product_id else ""
+            preview = extract_post_title(p.content_text)
+            text += f"{i}. {icon}{sku_part} {preview}\n"
 
         await callback.message.edit(text, components=cms_queue_list_keyboard(posts, cat_code))
 
@@ -147,7 +160,13 @@ class CmsQueueHandler(BaseHandler):
             f"📝 کپشن:\n{post.content_text}"
         )
         is_first = (post.queue_order == 1)
-        await callback.message.edit(text, components=cms_queue_post_keyboard(post_id, post.category, is_first=is_first))
+        kb = cms_queue_post_keyboard(post_id, post.category, is_first=is_first)
+        if post.image_file_id:
+            try: await callback.message.delete()
+            except: pass
+            await callback.message.chat.send_photo(photo=InputFile(post.image_file_id), caption=text, components=kb)
+        else:
+            await callback.message.edit(text, components=kb)
 
     async def queue_move_top(self, callback: CallbackQuery, ctx, match) -> None:
         if not await self.require_admin(callback.message.chat.id): return
@@ -270,8 +289,8 @@ class CmsQueueHandler(BaseHandler):
         for i, p in enumerate(posts, start=1):
             icon = "🖼" if p.image_file_id else "📝"
             product_tag = " [محصول]" if p.product_id else ""
-            preview = p.content_text[:35].replace("\n", " ")
-            text += f"{i}. {icon}{product_tag} {preview}...\n"
+            preview = extract_post_title(p.content_text)
+            text += f"{i}. {icon}{product_tag} {preview}\n"
 
         await callback.message.edit(text, components=cms_buffer_list_keyboard(posts, cat_code))
 
@@ -293,7 +312,13 @@ class CmsQueueHandler(BaseHandler):
             f"وضعیت: بافر | {icon}\n\n"
             f"📝 کپشن:\n{post.content_text}"
         )
-        await callback.message.edit(text, components=cms_buffer_post_keyboard(post_id, post.category))
+        kb = cms_buffer_post_keyboard(post_id, post.category)
+        if post.image_file_id:
+            try: await callback.message.delete()
+            except: pass
+            await callback.message.chat.send_photo(photo=InputFile(post.image_file_id), caption=text, components=kb)
+        else:
+            await callback.message.edit(text, components=kb)
 
     async def buffer_to_queue(self, callback: CallbackQuery, ctx, match) -> None:
         if not await self.require_admin(callback.message.chat.id): return
